@@ -1,0 +1,35 @@
+<!-- upload.html -->
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label for="bank_name">Bank Name:</label>
+    <select id="bank_name" name="bank_name">
+        <option value="hdfc">HDFC</option>
+        <option value="icici">ICICI</option>
+        <option value="karur_vysya">Karur Vysya Bank</option> <!-- Add new bank -->
+    </select>
+
+    <label for="year">Year:</label>
+    <input type="text" id="year" name="year">
+
+    <label for="month">Month:</label>
+    <input type="text" id="month" name="month">
+
+    <label for="booking_or_refund">Booking or Refund:</label>
+    <select id="booking_or_refund" name="booking_or_refund">
+        <option value="booking">Booking</option>
+        <option value="refund">Refund</option>
+    </select>
+
+    <!-- Add Merchant Name dropdown -->
+    <label for="merchant_name">Merchant Name:</label>
+    <select id="merchant_name" name="merchant_name">
+        <option value="irctc_web">IRCTC Web</option>
+        <option value="irctc_app">IRCTC App</option>
+        <option value="irctc_air_ticket">IRCTC Air Ticket</option>
+        <option value="irctc_tourism">IRCTC Tourism</option>
+        <option value="all">All</option>
+    </select>
+
+    <input type="file" name="files" multiple>
+    <button type="submit">Upload</button>
+</form>
