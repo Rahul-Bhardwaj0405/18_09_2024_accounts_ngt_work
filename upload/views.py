@@ -28,7 +28,7 @@ def upload_files(request):
         # Store task IDs in session
         request.session['task_ids'] = task_ids
 
-        return redirect('success')  # Redirect to success page
+        return redirect('display_data')  # Redirect to success page
 
     return render(request, 'upload.html')
 
