@@ -5,17 +5,16 @@ import logging
 from io import StringIO, BytesIO
 from .models import BookingData, RefundData  # Import models
 import base64
-from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 @shared_task
 def process_uploaded_files(file_content_base64, file_name, bank_name, year, month, booking_or_refund):
     file_content = base64.b64decode(file_content_base64)
-    print(file_content)
-    print(file_name)
+    print(bank_name)
+    logging.info(f"Processing file: {file_name}, Bank Name: {bank_name}, Booking/Refund: {booking_or_refund}")
+
     try:
         # Initialize an empty DataFrame
         df = pd.DataFrame()
@@ -29,10 +28,13 @@ def process_uploaded_files(file_content_base64, file_name, bank_name, year, mont
             elif file_name.endswith('.txt'):
                 df = pd.read_csv(StringIO(file_content.decode('utf-8')), delimiter='\t')
             elif file_name.endswith('.json'):
-                data = json.loads(file_content)
+                data = json.loads(file_content.decode('utf-8'))
                 df = pd.json_normalize(data)
+            elif file_name.endswith('.ods'):
+                df = pd.read_excel(BytesIO(file_content), engine='odf')
             else:
-                file_str = file_content.decode('utf-8')
+                # Try to guess file format if it's not recognized
+                file_str = file_content.decode('utf-8', errors='ignore')  # Decode with error handling
                 delimiter = ',' if ',' in file_str else '\t'
                 df = pd.read_csv(StringIO(file_str), delimiter=delimiter)
             logging.info(f"File read successfully: {file_name}")
@@ -44,45 +46,59 @@ def process_uploaded_files(file_content_base64, file_name, bank_name, year, mont
         df.columns = df.columns.str.strip().str.replace('.', '', regex=False)
         logging.info(f"Column names cleaned: {df.columns.tolist()}")
 
+
         # Extract required columns based on bank and booking/refund
         try:
-            if bank_name == 'Karur Vysya Bank':
+            if bank_name == 'karur_vysya':
                 # Extract sale total (count of rows)
                 sale_total = df['SNO'].count()  # Assumes 'S.NO.' cleaned to 'SNO'
                 logging.info(f"Sale total (count of rows): {sale_total}")
+                print(sale_total)
 
                 # Extract date from 'CREDITED ON'
                 credited_on_dates = pd.to_datetime(df['CREDITED ON'])
                 date = credited_on_dates.iloc[0].date() if not credited_on_dates.empty else None
                 logging.info(f"Date extracted: {date}")
+                print(date)
 
                 # Extract total sale amount (sum of 'BOOKING AMOUNT')
                 sale_amount = float(pd.to_numeric(df['BOOKING AMOUNT'], errors='coerce').fillna(0).sum())
                 logging.info(f"Total sale amount: {sale_amount}")
+                print(sale_amount)
 
-                # Save to the database
-                if booking_or_refund == 'booking':
-                    BookingData.objects.create(
-                        bank_name=bank_name,
-                        year=year,
-                        month=month,
-                        sale_total=sale_total,
-                        date=date,
-                        sale_amount=sale_amount
-                    )
-                    logging.info(f"Booking data saved successfully for file: {file_name}.")
-                elif booking_or_refund == 'refund':
-                    RefundData.objects.create(
-                        bank_name=bank_name,
-                        year=year,
-                        month=month,
-                        sale_total=sale_total,
-                        date=date,
-                        sale_amount=sale_amount
-                    )
-                    logging.info(f"Refund data saved successfully for file: {file_name}.")
+
+                if not BookingData.objects.filter(
+                    bank_name=bank_name,
+                    year=year,
+                    month=month,
+                    date=date,
+                    sale_amount=sale_amount
+                ).exists():
+                    # Save to the database
+                    if booking_or_refund == 'booking':
+                        BookingData.objects.create(
+                            bank_name=bank_name,
+                            year=year,
+                            month=month,
+                            sale_total=sale_total,
+                            date=date,
+                            sale_amount=sale_amount
+                        )
+                        logging.info(f"Booking data saved successfully for file: {file_name}.")
+                    elif booking_or_refund == 'refund':
+                        RefundData.objects.create(
+                            bank_name=bank_name,
+                            year=year,
+                            month=month,
+                            sale_total=sale_total,
+                            date=date,
+                            sale_amount=sale_amount
+                        )
+                        logging.info(f"Refund data saved successfully for file: {file_name}.")
+                    else:
+                        logging.error(f"Unknown booking_or_refund type: {booking_or_refund}")
                 else:
-                    logging.error(f"Unknown booking_or_refund type: {booking_or_refund}")
+                    logging.info(f"Duplicate entry found. Data not saved for file: {file_name}.")
 
             else:
                 logging.error(f"Unknown bank type: {bank_name}")

@@ -15,8 +15,12 @@ class BookingData(models.Model):
     date = models.DateField()  # Store the date from "CREDITED ON"
     sale_amount = models.DecimalField(max_digits=10, decimal_places=2)  # Store the "BOOKING AMOUNT"
 
+    class Meta:
+        unique_together = ('bank_name', 'year', 'month', 'date', 'sale_total', 'sale_amount')  # Ensure uniqueness
+
+
     def __str__(self):
-        return f"{self.bank_name} - {self.year}-{self.month} - Booking"
+        return f"{self.bank_name}, {self.year}, {self.month}, {self.date}, {self.sale_amount}, {self.sale_total}"
 
 
 class RefundData(models.Model):
